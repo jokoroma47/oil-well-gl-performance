@@ -96,3 +96,6 @@ Power BI · MySQL · Python · HTML · CSS · JavaScript
 
 ## Contact
 
+**Portfolio:** [jokoroma47.github.io](https://jokoroma47.github.io)
+**GitHub:** [@jokoroma47](https://github.com/jokoroma47)
+**LinkedIn:** [linkedin.com/in/jeremiah-okoroma-724908116](https://linkedin.com/in/jeremiah-okoroma-724908116)
