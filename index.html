@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Oil Well Performance Analytics — Gas Lift Optimisation | Data Analytics Portfolio</title>
+<meta name="description" content="Interactive oil well production dashboard — 13 gas lift wells, 12,406 readings, 3 GL configurations. Pressure analysis, fluid quality and anomaly detection.">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  :root{
+    --bg:#1A1D24;--surface:#1E2330;--surface2:#12151C;
+    --border:#2D3344;--border2:#3D4560;
+    --text:#E8ECF2;--text2:#8B96B0;--text3:#6B7899;
+    --orange:#E8620A;--orange2:#F5820D;--orange3:#F5A55A;
+    --green:#2ECC71;--green2:#27AE60;
+    --red:#E74C3C;--red2:#C0392B;
+    --blue:#3498DB;--blue2:#2980B9;
+    --yellow:#F1C40F;--yellow2:#F9E79F;
+    --cyan:#1ABC9C;--purple:#9B59B6;
+    --radius:12px;--radius-sm:8px;
+    --transition:all 0.2s cubic-bezier(0.4,0,0.2,1);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--text);font-size:13px;line-height:1.5;overflow-x:hidden}
+
+  .reveal{opacity:0;transform:translateY(18px);transition:opacity .5s ease,transform .5s ease}
+  .reveal.visible{opacity:1;transform:translateY(0)}
+
+  /* ── Header ── */
+  .header{background:linear-gradient(135deg,var(--surface2),var(--surface));border-bottom:1px solid var(--border);position:sticky;top:0;z-index:200;box-shadow:0 2px 20px rgba(0,0,0,0.5)}
+  .header-inner{max-width:1400px;margin:0 auto;padding:14px 24px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px}
+  .header-brand{display:flex;align-items:center;gap:14px}
+  .header-icon{width:44px;height:44px;background:linear-gradient(135deg,var(--orange),var(--orange2));border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;transition:var(--transition)}
+  .header-icon:hover{transform:scale(1.08)}
+  .header-title{color:var(--text);font-size:17px;font-weight:600;letter-spacing:-0.02em}
+  .header-sub{color:var(--text3);font-size:11px;margin-top:2px}
+  .header-pills{display:flex;gap:6px;flex-wrap:wrap}
+  .pill{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:6px 14px;text-align:center;transition:var(--transition);cursor:default}
+  .pill:hover{border-color:var(--orange);transform:translateY(-1px)}
+  .pill-val{color:var(--orange);font-size:14px;font-weight:600}
+  .pill-lbl{color:var(--text3);font-size:9px;text-transform:uppercase;letter-spacing:0.06em;margin-top:1px}
+
+  /* ── Nav ── */
+  .nav-bar{background:var(--surface2);border-bottom:1px solid var(--border)}
+  .nav-inner{max-width:1400px;margin:0 auto;padding:8px 24px;display:flex;align-items:center;gap:4px;overflow-x:auto}
+  .nav-btn{padding:8px 18px;background:transparent;border:none;border-radius:var(--radius-sm);color:var(--text2);font-size:12px;font-weight:500;cursor:pointer;white-space:nowrap;transition:var(--transition);position:relative}
+  .nav-btn::after{content:'';position:absolute;bottom:-1px;left:50%;right:50%;height:2px;background:var(--orange);transition:var(--transition)}
+  .nav-btn:hover{color:var(--text);background:var(--surface)}
+  .nav-btn:hover::after{left:10%;right:10%}
+  .nav-btn.active{color:var(--orange);background:var(--surface)}
+  .nav-btn.active::after{left:10%;right:10%}
+
+  /* ── Main ── */
+  .main{max-width:1400px;margin:0 auto;padding:20px 24px}
+  .page{display:none;animation:fadeIn .3s ease}.page.active{display:block}
+  @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+
+  /* ── Grids ── */
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
+  .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:14px}
+  @media(max-width:900px){.grid2,.grid3{grid-template-columns:1fr}}
+  @media(max-width:1100px){.grid3{grid-template-columns:1fr 1fr}}
+  .full{grid-column:1/-1}.mb14{margin-bottom:14px}
+
+  /* ── KPI cards ── */
+  .kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:14px}
+  .kpi{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px;position:relative;overflow:hidden;transition:var(--transition);cursor:default}
+  .kpi:hover{border-color:var(--orange);transform:translateY(-3px);box-shadow:0 6px 20px rgba(232,98,10,0.15)}
+  .kpi::after{content:'';position:absolute;bottom:0;left:0;right:0;height:2px;border-radius:0 0 var(--radius) var(--radius);transition:var(--transition)}
+  .kpi:hover::after{height:3px}
+  .kpi.org::after{background:var(--orange)}.kpi.grn::after{background:var(--green)}.kpi.red::after{background:var(--red)}.kpi.blu::after{background:var(--blue)}.kpi.yel::after{background:var(--yellow)}.kpi.cyn::after{background:var(--cyan)}
+  .kpi-val{font-size:21px;font-weight:700;color:var(--text);line-height:1.1;margin-top:4px}
+  .kpi-lbl{font-size:10px;color:var(--text3);margin-top:5px;text-transform:uppercase;letter-spacing:0.04em}
+
+  /* ── Cards ── */
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;transition:var(--transition)}
+  .card:hover{border-color:var(--border2)}
+  .card-title{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.07em;color:var(--text3);margin-bottom:12px;display:flex;align-items:center;gap:7px}
+  .card-title::before{content:'';width:3px;height:12px;border-radius:2px;background:var(--orange);display:inline-block;flex-shrink:0}
+
+  /* ── Charts ── */
+  .cw{position:relative;width:100%}
+  .h160{height:160px}.h180{height:180px}.h200{height:200px}.h220{height:220px}.h260{height:260px}.h280{height:280px}.h300{height:300px}.h340{height:340px}
+
+  /* ── Insight boxes ── */
+  .ins{background:var(--surface2);border-radius:var(--radius-sm);padding:10px 13px;font-size:12px;margin-bottom:12px;line-height:1.7;border-left:3px solid;transition:var(--transition)}
+  .ins:hover{transform:translateX(3px)}
+  .ins.org{border-color:var(--orange);color:var(--orange3)}
+  .ins.grn{border-color:var(--green);color:#82E0AA}
+  .ins.red{border-color:var(--red);color:#F1948A}
+  .ins.blu{border-color:var(--blue);color:#85C1E9}
+  .ins.yel{border-color:var(--yellow);color:var(--yellow2)}
+
+  /* ── Legend ── */
+  .legend{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:10px}
+  .legend span{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text2);transition:var(--transition);cursor:default}
+  .legend span:hover{color:var(--text)}
+  .legend i{width:10px;height:10px;border-radius:3px;display:inline-block;flex-shrink:0}
+
+  /* ── Horizontal bars ── */
+  .hbar-list{overflow-y:auto}
+  .hbar-row{display:flex;align-items:center;gap:8px;padding:5px 7px;border-radius:var(--radius-sm);transition:var(--transition);cursor:default}
+  .hbar-row:hover{background:var(--surface2)}
+  .hbar-lbl{flex:0 0 110px;font-size:11px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .hbar-track{flex:1;height:10px;background:var(--surface2);border-radius:5px;overflow:hidden}
+  .hbar-fill{height:100%;border-radius:5px;transition:width .8s cubic-bezier(.4,0,.2,1)}
+  .hbar-val{flex:0 0 60px;text-align:right;font-size:11px;font-weight:600;color:var(--text)}
+
+  /* ── Anomaly flags ── */
+  .flag-row{display:flex;align-items:flex-start;gap:12px;padding:10px 12px;border-radius:var(--radius-sm);background:var(--surface2);margin-bottom:8px;border-left:4px solid;transition:var(--transition)}
+  .flag-row:hover{background:var(--bg)}
+  .flag-row.red{border-color:var(--red)}.flag-row.yel{border-color:var(--yellow)}.flag-row.org{border-color:var(--orange)}
+  .flag-icon{font-size:18px;flex-shrink:0;margin-top:1px}
+  .flag-title{font-size:12px;font-weight:600;color:var(--text);margin-bottom:4px}
+  .flag-body{font-size:11px;color:var(--text2);line-height:1.6}
+
+  /* ── Footer ── */
+  .footer{background:var(--surface2);border-top:1px solid var(--border);color:var(--text3);text-align:center;padding:24px;font-size:11px;margin-top:40px}
+  .footer a{color:var(--orange);text-decoration:none;transition:var(--transition)}
+  .footer a:hover{color:var(--orange2)}
+
+  ::-webkit-scrollbar{width:4px;height:4px}
+  ::-webkit-scrollbar-track{background:var(--surface)}
+  ::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-inner">
+    <div class="header-brand">
+      <div class="header-icon">⛽</div>
+      <div>
+        <div class="header-title">Oil Well Performance Analytics — Gas Lift Optimisation &amp; Production Intelligence</div>
+        <div class="header-sub">13 wells &nbsp;·&nbsp; 3 GL configurations &nbsp;·&nbsp; 12,406 readings &nbsp;·&nbsp; Jun–Oct 2000</div>
+      </div>
+    </div>
+    <div class="header-pills">
+      <div class="pill"><div class="pill-val">13</div><div class="pill-lbl">Wells</div></div>
+      <div class="pill"><div class="pill-val">12,406</div><div class="pill-lbl">Readings</div></div>
+      <div class="pill"><div class="pill-val">39.7%</div><div class="pill-lbl">Avg Water Cut</div></div>
+      <div class="pill"><div class="pill-val">0 ppm</div><div class="pill-lbl">H2S — Safe</div></div>
+    </div>
+  </div>
+</div>
+
+<div class="nav-bar">
+  <div class="nav-inner">
+    <button class="nav-btn active" onclick="showPage('p1',this)">Field Overview</button>
+    <button class="nav-btn" onclick="showPage('p2',this)">Pressure Analysis</button>
+    <button class="nav-btn" onclick="showPage('p3',this)">Fluid Quality</button>
+    <button class="nav-btn" onclick="showPage('p4',this)">GL Configuration</button>
+    <button class="nav-btn" onclick="showPage('p5',this)">Well Health</button>
+  </div>
+</div>
+
+<div class="main">
+
+<!-- PAGE 1 -->
+<div class="page active" id="p1">
+  <div class="kpi-grid reveal">
+    <div class="kpi org"><div class="kpi-val">13</div><div class="kpi-lbl">Active wells</div></div>
+    <div class="kpi blu"><div class="kpi-val">12,406</div><div class="kpi-lbl">Total readings</div></div>
+    <div class="kpi org"><div class="kpi-val">32.9 bar</div><div class="kpi-lbl">Avg THP field-wide</div></div>
+    <div class="kpi grn"><div class="kpi-val">64.7 bar</div><div class="kpi-lbl">Avg CHP field-wide</div></div>
+    <div class="kpi yel"><div class="kpi-val">39.7%</div><div class="kpi-lbl">Avg water cut</div></div>
+    <div class="kpi red"><div class="kpi-val">5</div><div class="kpi-lbl">Anomaly flags</div></div>
+    <div class="kpi grn"><div class="kpi-val">0 ppm</div><div class="kpi-lbl">H2S — all wells safe</div></div>
+    <div class="kpi cyn"><div class="kpi-val">3</div><div class="kpi-lbl">GL configurations</div></div>
+  </div>
+  <div class="ins org reveal">Field covers 13 gas lift wells across 3 configurations — Short String (1 well), Long String (3 wells) and Standard GL (9 wells). Field-wide THP averages 32.9 bar. No H2S detected across any well or any reading period — field-wide safe conditions confirmed.</div>
+  <div class="grid2 reveal">
+    <div class="card">
+      <div class="card-title">THP average by well (bar) — sorted descending</div>
+      <div class="hbar-list" id="p1-thp"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Water cut average by well (%) — sorted descending</div>
+      <div class="hbar-list" id="p1-wc"></div>
+    </div>
+  </div>
+  <div class="grid3 reveal">
+    <div class="card">
+      <div class="card-title">Wells by GL configuration</div>
+      <div class="legend"><span><i style="background:#E8620A"></i>Standard (9)</span><span><i style="background:#3498DB"></i>Long String (3)</span><span><i style="background:#F1C40F"></i>Short String (1)</span></div>
+      <div class="cw h180"><canvas id="c1a"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-title">THP distribution — all wells (bar buckets)</div>
+      <div class="cw h180"><canvas id="c1b"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-title">CHP distribution — all wells (bar buckets)</div>
+      <div class="cw h180"><canvas id="c1c"></canvas></div>
+    </div>
+  </div>
+</div>
+
+<!-- PAGE 2 -->
+<div class="page" id="p2">
+  <div class="kpi-grid reveal">
+    <div class="kpi red"><div class="kpi-val">Well_354</div><div class="kpi-lbl">Highest THP — 134 bar</div></div>
+    <div class="kpi grn"><div class="kpi-val">Well_202</div><div class="kpi-lbl">Highest CHP — 105.3 bar</div></div>
+    <div class="kpi blu"><div class="kpi-val">Well_284</div><div class="kpi-lbl">Highest TAP — 149.9 bar</div></div>
+    <div class="kpi red"><div class="kpi-val">Well_286A</div><div class="kpi-lbl">Zero CHP — no injection</div></div>
+  </div>
+  <div class="ins red reveal">Well_354 has a THP of 134 bar — nearly 3.5x higher than the next well (Well_312E at 38.8 bar). This suggests a fundamentally different reservoir pressure regime. Well_286A has zero CHP for all 876 readings — no gas injection pressure detected throughout the monitoring period.</div>
+  <div class="grid2 reveal">
+    <div class="card">
+      <div class="card-title">Average THP by well (bar) — tubing head pressure</div>
+      <div class="cw h300"><canvas id="c2a"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Average CHP by well (bar) — casing head / injection pressure</div>
+      <div class="cw h300"><canvas id="c2b"></canvas></div>
+    </div>
+  </div>
+  <div class="card full reveal" style="margin-top:0">
+    <div class="card-title">Average TAP by well (bar) — tubing annulus pressure / injection depth proxy</div>
+    <div class="ins blu">Long String wells show 64–150 bar TAP vs 0–40 bar for Standard GL wells. The TAP difference directly reflects deeper gas injection points. Long String TAP averages 111 bar vs 30 bar for Standard — a 3.7x difference.</div>
+    <div class="cw h200"><canvas id="c2c"></canvas></div>
+  </div>
+</div>
+
+<!-- PAGE 3 -->
+<div class="page" id="p3">
+  <div class="kpi-grid reveal">
+    <div class="kpi red"><div class="kpi-val">Well_202</div><div class="kpi-lbl">Highest water cut — 62%</div></div>
+    <div class="kpi grn"><div class="kpi-val">Well_354</div><div class="kpi-lbl">Lowest water cut — 1.6%</div></div>
+    <div class="kpi yel"><div class="kpi-val">39.7%</div><div class="kpi-lbl">Field avg water cut</div></div>
+    <div class="kpi grn"><div class="kpi-val">0 ppm</div><div class="kpi-lbl">H2S — zero across all wells</div></div>
+  </div>
+  <div class="ins yel reveal">5 wells exceed 50% water cut — Wells 202, 295A, 206B, 209B and 284. High water cut means more than half of what these wells produce is water. This significantly increases lift energy requirements and reduces effective oil production. Gas lift optimisation is critical for these wells.</div>
+  <div class="grid2 reveal">
+    <div class="card">
+      <div class="card-title">Water cut average by well (%) — colour coded by severity</div>
+      <div class="cw h300"><canvas id="c3a"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-title">BS&W average by well (%) — basic sediment &amp; water</div>
+      <div class="ins org">BS&W closely tracks water cut across all wells — confirming water as the primary impurity. Sand content is minimal — max average 0.05% (Well_312E). Emulsion is zero across all wells.</div>
+      <div class="cw h260"><canvas id="c3b"></canvas></div>
+    </div>
+  </div>
+  <div class="card full reveal" style="margin-top:0">
+    <div class="card-title">Water cut by GL configuration type — avg, min, max</div>
+    <div class="cw h180"><canvas id="c3c"></canvas></div>
+  </div>
+</div>
+
+<!-- PAGE 4 -->
+<div class="page" id="p4">
+  <div class="kpi-grid reveal">
+    <div class="kpi blu"><div class="kpi-val">111.3 bar</div><div class="kpi-lbl">Long String avg TAP</div></div>
+    <div class="kpi yel"><div class="kpi-val">36.0 bar</div><div class="kpi-lbl">Short String avg TAP</div></div>
+    <div class="kpi org"><div class="kpi-val">29.9 bar</div><div class="kpi-lbl">Standard GL avg TAP</div></div>
+    <div class="kpi grn"><div class="kpi-val">Well_296A</div><div class="kpi-lbl">A/B configuration study</div></div>
+  </div>
+  <div class="ins grn reveal">Well_296A appears in both Standard and Long String GL datasets with identical readings — confirming it is a deliberate A/B configuration comparison study. Its intermediate TAP (64.7 bar) sits between Standard (30 bar) and full Long String (119–150 bar), reflecting its transitional completion depth.</div>
+  <div class="grid2 reveal">
+    <div class="card">
+      <div class="card-title">Pressure metrics by GL configuration type</div>
+      <div class="legend"><span><i style="background:#E8620A"></i>THP (bar)</span><span><i style="background:#3498DB"></i>CHP (bar)</span><span><i style="background:#2ECC71"></i>TAP (bar)</span></div>
+      <div class="cw h260"><canvas id="c4a"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Water cut &amp; choke size by GL configuration</div>
+      <div class="legend"><span><i style="background:#F1C40F"></i>Water cut %</span><span><i style="background:#E8620A"></i>Avg choke (1/64")</span></div>
+      <div class="cw h260"><canvas id="c4b"></canvas></div>
+    </div>
+  </div>
+  <div class="card full reveal" style="margin-top:0">
+    <div class="card-title">TAP per well — clearest differentiator between GL configurations</div>
+    <div class="cw h200"><canvas id="c4c"></canvas></div>
+  </div>
+</div>
+
+<!-- PAGE 5 -->
+<div class="page" id="p5">
+  <div class="kpi-grid reveal">
+    <div class="kpi red"><div class="kpi-val">Well_286A</div><div class="kpi-lbl">Most unstable — CV 31.2%</div></div>
+    <div class="kpi grn"><div class="kpi-val">Well_294A</div><div class="kpi-lbl">Most stable — CV 4.6%</div></div>
+    <div class="kpi red"><div class="kpi-val">5</div><div class="kpi-lbl">Anomaly flags raised</div></div>
+    <div class="kpi yel"><div class="kpi-val">Well_354</div><div class="kpi-lbl">Outlier pressure regime</div></div>
+  </div>
+  <div class="grid2 reveal">
+    <div class="card">
+      <div class="card-title">THP instability — coefficient of variation (%) per well</div>
+      <div class="ins org">CV = THP standard deviation / THP mean. Higher CV = more unstable wellhead pressure. Well_286A (31.2%) and Well_278 (24.3%) show the highest pressure variability — both candidates for lift optimisation review.</div>
+      <div class="cw h280"><canvas id="c5a"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Anomaly flags — well health alerts</div>
+      <div style="margin-top:4px">
+        <div class="flag-row red">
+          <div class="flag-icon">🔴</div>
+          <div><div class="flag-title">Well_286A — Zero CHP Throughout</div><div class="flag-body">CHP = 0 bar for all 876 readings. No gas injection pressure detected. Gas lift is either inactive, a valve is stuck closed, or measurement equipment has failed. Immediate investigation required.</div></div>
+        </div>
+        <div class="flag-row red">
+          <div class="flag-icon">🔴</div>
+          <div><div class="flag-title">Well_354 — Extreme THP at 134 bar</div><div class="flag-body">THP averages 134 bar — 3.5x higher than any other well. This well appears to be in a fundamentally different pressure regime, possibly naturally flowing at high reservoir pressure rather than requiring conventional gas lift.</div></div>
+        </div>
+        <div class="flag-row yel">
+          <div class="flag-icon">🟡</div>
+          <div><div class="flag-title">Well_312E — Zero TAP Throughout</div><div class="flag-body">TAP = 0 bar for all readings. No tubing annulus pressure detected. This may indicate a different completion architecture, a closed annulus valve, or a sensor failure at this measurement point.</div></div>
+        </div>
+        <div class="flag-row yel">
+          <div class="flag-icon">🟡</div>
+          <div><div class="flag-title">Well_206B &amp; Well_209B — Identical Data</div><div class="flag-body">Both wells share exactly the same THP, CHP, TAP and water cut readings across all 923 rows. These may be the same physical well under two IDs, or data was duplicated in the field collection system.</div></div>
+        </div>
+        <div class="flag-row org">
+          <div class="flag-icon">🟠</div>
+          <div><div class="flag-title">Well_296A — Deliberate A/B Configuration Study</div><div class="flag-body">Well_296A appears in both Standard GL and Long String GL datasets with identical readings. This is a planned comparison study — not an error — designed to evaluate whether a long string completion improves lift performance.</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div>
+
+<div class="footer">
+  <p><strong style="color:var(--text)">Oil Well Performance Analytics — Gas Lift Optimisation &amp; Production Intelligence</strong> &nbsp;·&nbsp; Data Analytics Portfolio Project</p>
+  <p style="margin-top:6px">Built with HTML5, CSS3 &amp; JavaScript &nbsp;·&nbsp; Tools: Power BI &bull; MySQL &bull; Python &nbsp;·&nbsp; Dataset: 13 gas lift wells, Jun–Oct 2000</p>
+</div>
+
+<script>
+const TX='#6B7899',GC='rgba(255,255,255,0.04)';
+Chart.defaults.font.family='-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif';
+Chart.defaults.font.size=11;Chart.defaults.color=TX;
+
+function mk(id,type,labels,datasets,opts){
+  const el=document.getElementById(id);if(!el)return;
+  return new Chart(el,{type,data:{labels,datasets},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},layout:{padding:4},...opts}});
+}
+
+const WELLS=['W_202','W_206B','W_209B','W_278','W_284','W_286A','W_294A','W_295A','W_296A_LS','W_296A_ST','W_297A','W_312E','W_354'];
+const THP=[22.4,27.0,27.0,21.5,34.5,20.1,17.7,10.0,25.1,25.1,26.3,38.8,134.0];
+const CHP=[105.3,96.1,96.1,80.6,84.5,0.0,30.0,8.5,88.4,88.4,82.3,63.9,10.6];
+const TAP=[37.7,39.1,39.1,36.0,149.9,24.0,13.7,19.1,64.7,64.7,118.2,0.0,31.4];
+const WC=[62.0,55.6,55.6,25.2,54.4,26.5,24.9,61.5,49.8,49.8,39.5,7.3,1.6];
+const GL=['w','w','w','s','l','w','w','w','l','w','l','w','w']; // w=standard, l=long, s=short
+const GCOL=GL.map(t=>t==='l'?'#3498DB':t==='s'?'#F1C40F':'#E8620A');
+
+/* P1 bars */
+const thp_s=[...WELLS.map((w,i)=>({w,v:THP[i],c:GCOL[i]}))].sort((a,b)=>b.v-a.v);
+document.getElementById('p1-thp').innerHTML=thp_s.map(d=>`<div class="hbar-row"><div class="hbar-lbl">${d.w}</div><div class="hbar-track"><div class="hbar-fill" style="width:0%;background:${d.v>100?'#E74C3C':d.c}" data-w="${(d.v/134*100).toFixed(1)}"></div></div><div class="hbar-val">${d.v} bar</div></div>`).join('');
+const wc_s=[...WELLS.map((w,i)=>({w,v:WC[i],c:GCOL[i]}))].sort((a,b)=>b.v-a.v);
+document.getElementById('p1-wc').innerHTML=wc_s.map(d=>`<div class="hbar-row"><div class="hbar-lbl">${d.w}</div><div class="hbar-track"><div class="hbar-fill" style="width:0%;background:${d.v>50?'#E74C3C':d.v>30?'#F1C40F':'#2ECC71'}" data-w="${d.v}"></div></div><div class="hbar-val">${d.v}%</div></div>`).join('');
+
+mk('c1a','doughnut',['Standard GL (9)','Long String GL (3)','Short String GL (1)'],[{data:[9,3,1],backgroundColor:['#E8620A','#3498DB','#F1C40F'],borderWidth:3,borderColor:'#1E2330'}],{cutout:'65%',plugins:{legend:{display:true,position:'bottom',labels:{color:TX,font:{size:10},boxWidth:10,padding:10}}}});
+mk('c1b','bar',['<15 bar','15-20','20-25','25-30','30-40','40-50','>100'],[{data:[1,0,3,4,3,1,1],backgroundColor:'#E8620A',borderRadius:4}],{scales:{x:{ticks:{color:TX,font:{size:9}},grid:{display:false}},y:{ticks:{color:TX},grid:{color:GC}}}});
+mk('c1c','bar',['0 bar','1-30','30-65','65-90','90-110'],[{data:[1,2,2,3,5],backgroundColor:'#3498DB',borderRadius:4}],{scales:{x:{ticks:{color:TX,font:{size:9}},grid:{display:false}},y:{ticks:{color:TX},grid:{color:GC}}}});
+
+/* P2 */
+mk('c2a','bar',WELLS,[{data:THP,backgroundColor:THP.map(v=>v>100?'#E74C3C':v>40?'#F1C40F':'#E8620A'),borderRadius:4}],{indexAxis:'y',scales:{x:{ticks:{callback:v=>v+' bar',color:TX},grid:{color:GC}},y:{ticks:{color:TX,font:{size:10}},grid:{display:false}}}});
+mk('c2b','bar',WELLS,[{data:CHP,backgroundColor:CHP.map(v=>v===0?'#E74C3C':v>90?'#2ECC71':'#3498DB'),borderRadius:4}],{indexAxis:'y',scales:{x:{ticks:{callback:v=>v+' bar',color:TX},grid:{color:GC}},y:{ticks:{color:TX,font:{size:10}},grid:{display:false}}}});
+mk('c2c','bar',WELLS,[{data:TAP,backgroundColor:GCOL.map((c,i)=>TAP[i]>100?'#3498DB':TAP[i]===0?'#E74C3C':c),borderRadius:4}],{scales:{x:{ticks:{color:TX,font:{size:9},maxRotation:30},grid:{display:false}},y:{ticks:{callback:v=>v+' bar',color:TX},grid:{color:GC}}}});
+
+/* P3 */
+mk('c3a','bar',WELLS,[{data:WC,backgroundColor:WC.map(v=>v>50?'#E74C3C':v>30?'#F1C40F':'#2ECC71'),borderRadius:4}],{indexAxis:'y',scales:{x:{ticks:{callback:v=>v+'%',color:TX},grid:{color:GC}},y:{ticks:{color:TX,font:{size:10}},grid:{display:false}}}});
+const BSW=[62.1,55.6,55.6,25.3,54.4,26.5,24.9,61.5,49.8,49.8,39.5,7.4,1.6];
+mk('c3b','bar',WELLS,[{data:BSW,backgroundColor:'#F1C40F',borderRadius:4}],{indexAxis:'y',scales:{x:{ticks:{callback:v=>v+'%',color:TX},grid:{color:GC}},y:{ticks:{color:TX,font:{size:10}},grid:{display:false}}}});
+mk('c3c','bar',['Long String GL','Short String GL','Standard GL'],[
+  {label:'Min',data:[8,4,0.5],backgroundColor:'#2ECC71',borderRadius:3},
+  {label:'Avg',data:[47.49,25.24,38.54],backgroundColor:'#F1C40F',borderRadius:3},
+  {label:'Max',data:[70,54,78],backgroundColor:'#E74C3C',borderRadius:3}
+],{scales:{x:{ticks:{color:TX},grid:{display:false}},y:{ticks:{callback:v=>v+'%',color:TX},grid:{color:GC}}}});
+
+/* P4 */
+mk('c4a','bar',['Long String GL','Short String GL','Standard GL'],[
+  {label:'THP',data:[28.52,21.48,35.70],backgroundColor:'#E8620A',borderRadius:3},
+  {label:'CHP',data:[84.94,80.56,55.91],backgroundColor:'#3498DB',borderRadius:3},
+  {label:'TAP',data:[111.25,35.98,29.93],backgroundColor:'#2ECC71',borderRadius:3}
+],{scales:{x:{ticks:{color:TX},grid:{display:false}},y:{ticks:{callback:v=>v+' bar',color:TX},grid:{color:GC}}}});
+mk('c4b','bar',['Long String GL','Short String GL','Standard GL'],[
+  {label:'Water cut %',data:[47.49,25.24,38.54],backgroundColor:'#F1C40F',borderRadius:3},
+  {label:'Choke (1/64")',data:[32.93,20.0,27.48],backgroundColor:'#E8620A',borderRadius:3}
+],{scales:{x:{ticks:{color:TX},grid:{display:false}},y:{ticks:{color:TX},grid:{color:GC}}}});
+mk('c4c','bar',['W_284(L)','W_297A(L)','W_296A(A/B)','W_278(S)','W_202(Std)','W_206B(Std)','W_209B(Std)','W_354(Std)','W_286A(Std)','W_295A(Std)','W_294A(Std)','W_312E(Std)'],
+  [{data:[149.9,118.2,64.7,36.0,37.7,39.1,39.1,31.4,24.0,19.1,13.7,0.0],backgroundColor:['#3498DB','#3498DB','#9B59B6','#F1C40F','#E8620A','#E8620A','#E8620A','#E8620A','#E8620A','#E8620A','#E8620A','#E74C3C'],borderRadius:4}],
+  {scales:{x:{ticks:{color:TX,font:{size:9},maxRotation:30},grid:{display:false}},y:{ticks:{callback:v=>v+' bar',color:TX},grid:{color:GC}}}}
+);
+
+/* P5 */
+const CV=[9.3,10.9,10.9,24.3,10.9,31.2,4.6,11.2,6.1,6.1,15.9,5.6,1.8];
+const cv_s=[...WELLS.map((w,i)=>({w,v:CV[i]}))].sort((a,b)=>b.v-a.v);
+mk('c5a','bar',cv_s.map(d=>d.w),[{data:cv_s.map(d=>d.v),backgroundColor:cv_s.map(d=>d.v>20?'#E74C3C':d.v>10?'#F1C40F':'#2ECC71'),borderRadius:4}],{indexAxis:'y',scales:{x:{ticks:{callback:v=>v+'%',color:TX},grid:{color:GC}},y:{ticks:{color:TX,font:{size:10}},grid:{display:false}}}});
+
+/* ── Interactions ── */
+function showPage(id,btn){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  btn.classList.add('active');
+  setTimeout(()=>document.querySelectorAll('#'+id+' .reveal').forEach(el=>el.classList.add('visible')),50);
+  setTimeout(animateBars,200);
+}
+const observer=new IntersectionObserver(entries=>{entries.forEach(e=>{if(e.isIntersecting)e.target.classList.add('visible');});},{threshold:0.1});
+document.querySelectorAll('.reveal').forEach(el=>observer.observe(el));
+function animateBars(){
+  document.querySelectorAll('.hbar-fill[data-w]').forEach(b=>{
+    setTimeout(()=>b.style.width=b.getAttribute('data-w')+'%',80);
+  });
+}
+setTimeout(()=>{
+  document.querySelectorAll('#p1 .reveal').forEach(el=>el.classList.add('visible'));
+  setTimeout(animateBars,300);
+},100);
+</script>
+</body>
+</html>
