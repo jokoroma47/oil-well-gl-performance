@@ -93,6 +93,12 @@ Power BI · MySQL · Python · HTML · CSS · JavaScript
 | data/oil_wells_cleaned.csv |
 
 ---
+## Data Credit
+
+Dataset: **Production dataset series**  
+Source: Kaggle — [kaggle.com/datasets/sgobir/production-dataset/versions/1](https://www.kaggle.com/datasets/sgobir/production-dataset/versions/1)  
+Author: sgobir  
+Version: 1  
 
 ## Contact
 
