@@ -81,7 +81,7 @@ rankings and five detailed anomaly flags.
 
 ## Tools Used
 
-Power BI · MySQL · Python · HTML · CSS · JavaScript
+Power BI · MySQL · Python
 
 ---
 
